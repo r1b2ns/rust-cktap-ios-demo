@@ -13,17 +13,34 @@ struct ContentView: View {
 
     var body: some View {
         rootContent
-            .alert("Card PIN", isPresented: $reader.isAskingPIN) {
+            .alert(reader.pinAlertTitle, isPresented: $reader.isAskingPIN) {
                 SecureField("CVC / PIN", text: $reader.pin)
                     .textContentType(.password)
                     .keyboardType(.numberPad)
 
                 Button("Cancel", role: .cancel) {}
-                Button("Scan") {
+                Button(reader.pinAlertConfirm) {
                     reader.scan()
                 }
             } message: {
-                Text("Enter the CVC for Tapsigner. Leave empty for SatsCard.")
+                Text(reader.pinAlertMessage)
+            }
+            .alert(
+                "Tapsigner not initialized",
+                isPresented: Binding(
+                    get: { reader.pendingUninitialized != nil },
+                    set: { if !$0 { reader.pendingUninitialized = nil } }
+                ),
+                presenting: reader.pendingUninitialized
+            ) { info in
+                Button("No", role: .cancel) {
+                    reader.saveUninitialized(info)
+                }
+                Button("Yes") {
+                    reader.startInitFlow()
+                }
+            } message: { _ in
+                Text("Do you want to init now?")
             }
             .alert(
                 reader.lastResult?.title ?? "Card",
@@ -109,8 +126,14 @@ private struct SavedCardsView: View {
                     Section("Tapsigner") {
                         ForEach(store.tapsigners) { card in
                             TapsignerRow(card: card)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        store.removeTapsigner(id: card.id)
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                }
                         }
-                        .onDelete { store.remove(tapsignerAt: $0) }
                     }
                 }
 
@@ -118,8 +141,14 @@ private struct SavedCardsView: View {
                     Section("SatsCard") {
                         ForEach(store.satsCards) { card in
                             SatsCardRow(card: card)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        store.removeSatsCard(id: card.id)
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                }
                         }
-                        .onDelete { store.remove(satsCardAt: $0) }
                     }
                 }
 
@@ -127,13 +156,19 @@ private struct SavedCardsView: View {
                     Section("SatsChip") {
                         ForEach(store.satsChips) { card in
                             SatsChipRow(card: card)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        store.removeSatsChip(id: card.id)
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                }
                         }
-                        .onDelete { store.remove(satsChipAt: $0) }
                     }
                 }
             }
             .listStyle(.insetGrouped)
-            .navigationTitle("Saved Cards")
+            .navigationTitle("Cards")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -157,8 +192,23 @@ private struct TapsignerRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(card.cardIdent)
-                .font(.headline)
+            HStack {
+                Text(card.cardIdent)
+                    .font(.headline)
+                    .truncationMode(.middle)
+                    .lineLimit(1)
+                
+                if !card.isInitialized {
+                    Spacer()
+                    Text("uninitialized")
+                        .font(.caption2)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.orange.opacity(0.2))
+                        .foregroundStyle(.orange)
+                        .clipShape(Capsule())
+                }
+            }
             HStack(spacing: 8) {
                 Text("v\(card.version)")
                 Text("•")

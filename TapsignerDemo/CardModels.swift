@@ -41,6 +41,10 @@ nonisolated struct SatsChipInfo: Codable, Identifiable, Hashable, Sendable {
     let savedAt: Date
 }
 
+nonisolated enum CardReadError: Error, Sendable {
+    case tapsignerNotInitialized(TapsignerInfo)
+}
+
 nonisolated enum CardReadResult: Sendable, Hashable {
     case tapsigner(TapsignerInfo)
     case satsCard(SatsCardSavedInfo)
@@ -63,7 +67,12 @@ nonisolated enum CardReadResult: Sendable, Hashable {
     }
 }
 
-extension TapsignerInfo {
+nonisolated extension TapsignerInfo {
+    var isInitialized: Bool {
+        guard let path else { return false }
+        return !path.isEmpty
+    }
+
     var displayText: String {
         var lines: [String] = []
         lines.append("Card Ident: \(cardIdent)")
@@ -87,7 +96,7 @@ extension TapsignerInfo {
     }
 }
 
-extension SatsCardSavedInfo {
+nonisolated extension SatsCardSavedInfo {
     var displayText: String {
         var lines: [String] = []
         lines.append("Card Ident: \(cardIdent)")
@@ -105,7 +114,7 @@ extension SatsCardSavedInfo {
     }
 }
 
-extension SatsChipInfo {
+nonisolated extension SatsChipInfo {
     var displayText: String {
         var lines: [String] = []
         lines.append("Card Ident: \(cardIdent)")

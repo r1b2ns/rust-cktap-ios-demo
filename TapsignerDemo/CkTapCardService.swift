@@ -25,25 +25,33 @@ nonisolated final class CkTapCardService: Sendable {
         }
     }
 
+    /// Runs the `init` (a.k.a. `new`) command on a TAPSIGNER and then reads the resulting state.
+    /// Required before `read`, `xpub`, `sign`, etc. can be used on a brand new card.
+    func initializeTapsigner(transport: CkTransport, cvc: String) async throws -> CardReadResult {
+        Log.cktap.debug("toCktap: calling SELECT (init flow)…")
+        let card = try await toCktap(transport: transport)
+        guard case .tapSigner(let tapSigner) = card else {
+            Log.cktap.error("Initialize requested but card is not a Tapsigner")
+            throw CkTapError.UnknownCardType
+        }
+
+        Log.cktap.info("Initializing Tapsigner (this is irreversible)…")
+        try await tapSigner.`init`(cvc: cvc)
+        Log.cktap.info("Tapsigner init succeeded; reading full state…")
+
+        return .tapsigner(try await readTapsigner(tapSigner, cvc: cvc))
+    }
+
     // MARK: - Tapsigner
 
     private func readTapsigner(_ card: TapSigner, cvc: String) async throws -> TapsignerInfo {
         Log.cktap.debug("Tapsigner: fetching status…")
         let status = await card.status()
         Log.cktap.info(
-            "Tapsigner status: ver=\(status.ver, privacy: .public) ident=\(status.cardIdent, privacy: .public) backups=\(status.numBackups, privacy: .public) authDelay=\(status.authDelay ?? 0)"
+            "Tapsigner status: ver=\(status.ver, privacy: .public) ident=\(status.cardIdent, privacy: .public) backups=\(status.numBackups, privacy: .public) authDelay=\(status.authDelay ?? 0) hasPath=\(status.path?.isEmpty == false)"
         )
 
-        var derived: String?
-        if !cvc.isEmpty {
-            Log.cktap.debug("Tapsigner: calling read(cvc:)…")
-            derived = try await card.read(cvc: cvc)
-            Log.cktap.info("Tapsigner: derived pubkey received")
-        } else {
-            Log.cktap.info("Tapsigner: no CVC supplied, skipping read()")
-        }
-
-        return TapsignerInfo(
+        let baseInfo = TapsignerInfo(
             cardIdent: status.cardIdent,
             version: status.ver,
             birth: status.birth,
@@ -51,9 +59,49 @@ nonisolated final class CkTapCardService: Sendable {
             path: status.path,
             pubkey: status.pubkey,
             authDelay: status.authDelay,
-            derivedPubkey: derived,
+            derivedPubkey: nil,
             savedAt: Date()
         )
+
+        // Brand new TAPSIGNER: no master key picked yet. `read(cvc:)` will fail with
+        // CardError.InvalidState (406). Surface this so the UI can offer to init.
+        if !baseInfo.isInitialized {
+            Log.cktap.info("Tapsigner is uninitialized (status.path is empty/nil)")
+            throw CardReadError.tapsignerNotInitialized(baseInfo)
+        }
+
+        guard !cvc.isEmpty else {
+            Log.cktap.info("Tapsigner: no CVC supplied, skipping read()")
+            return baseInfo
+        }
+
+        Log.cktap.debug("Tapsigner: calling read(cvc:)…")
+        do {
+            let derived = try await card.read(cvc: cvc)
+            Log.cktap.info("Tapsigner: derived pubkey received")
+            return TapsignerInfo(
+                cardIdent: baseInfo.cardIdent,
+                version: baseInfo.version,
+                birth: baseInfo.birth,
+                numBackups: baseInfo.numBackups,
+                path: baseInfo.path,
+                pubkey: baseInfo.pubkey,
+                authDelay: baseInfo.authDelay,
+                derivedPubkey: derived,
+                savedAt: baseInfo.savedAt
+            )
+        } catch let error as ReadError {
+            // Defensive: in case the status check above didn't catch the uninitialized state
+            // (e.g. firmware quirk), translate InvalidState into the typed marker.
+            if case .CkTap(let inner) = error,
+                case .Card(let cardErr) = inner,
+                case .InvalidState = cardErr
+            {
+                Log.cktap.info("Tapsigner read returned InvalidState; treating as uninitialized")
+                throw CardReadError.tapsignerNotInitialized(baseInfo)
+            }
+            throw error
+        }
     }
 
     // MARK: - SatsCard

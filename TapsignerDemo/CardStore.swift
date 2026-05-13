@@ -58,6 +58,21 @@ final class CardStore {
         persist()
     }
 
+    func removeTapsigner(id: String) {
+        tapsigners.removeAll { $0.id == id }
+        persist()
+    }
+
+    func removeSatsCard(id: String) {
+        satsCards.removeAll { $0.id == id }
+        persist()
+    }
+
+    func removeSatsChip(id: String) {
+        satsChips.removeAll { $0.id == id }
+        persist()
+    }
+
     private func upsert<T: Identifiable>(_ value: T, into array: inout [T]) where T.ID == String {
         if let index = array.firstIndex(where: { $0.id == value.id }) {
             array[index] = value
