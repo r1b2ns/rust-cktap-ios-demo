@@ -5,19 +5,15 @@ import os
 // MARK: - Action
 
 enum TapsignerAction: String, Identifiable, CaseIterable {
-    case signMessage
     case showXpub
     case changePin
-    case backupKey
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .signMessage: return String(localized: "Sign message")
-        case .showXpub:    return String(localized: "Show XPUB")
-        case .changePin:   return String(localized: "Change PIN")
-        case .backupKey:   return String(localized: "Back up key")
+        case .showXpub:  return String(localized: "Show XPUB")
+        case .changePin: return String(localized: "Change PIN")
         }
     }
 }
@@ -82,8 +78,8 @@ final class CardDetailViewModel: CardDetailViewModelProtocol {
         switch action {
         case .showXpub:
             requestShowXpub()
-        case .signMessage, .changePin, .backupKey:
-            // Implementations land here as features are built.
+        case .changePin:
+            // Implementation lands here as the feature is built.
             break
         }
     }
