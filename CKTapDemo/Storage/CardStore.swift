@@ -1,21 +1,14 @@
-//
-//  CardStore.swift
-//  TapsignerDemo
-//
-
+import Combine
 import Foundation
-import Observation
 import SwiftUI
 import os
 
-@Observable
 @MainActor
-final class CardStore {
-    private(set) var tapsigners: [TapsignerInfo] = []
-    private(set) var satsCards: [SatsCardSavedInfo] = []
-    private(set) var satsChips: [SatsChipInfo] = []
+final class CardStore: ObservableObject {
+    @Published private(set) var tapsigners: [TapsignerInfo] = []
+    @Published private(set) var satsCards: [SatsCardSavedInfo] = []
+    @Published private(set) var satsChips: [SatsChipInfo] = []
 
-    @ObservationIgnored
     private let storageURL: URL
 
     init() {
@@ -27,10 +20,6 @@ final class CardStore {
         load()
     }
 
-    var isEmpty: Bool {
-        tapsigners.isEmpty && satsCards.isEmpty && satsChips.isEmpty
-    }
-
     func save(_ result: CardReadResult) {
         switch result {
         case .tapsigner(let info):
@@ -40,21 +29,6 @@ final class CardStore {
         case .satsChip(let info):
             upsert(info, into: &satsChips)
         }
-        persist()
-    }
-
-    func remove(tapsignerAt offsets: IndexSet) {
-        tapsigners.remove(atOffsets: offsets)
-        persist()
-    }
-
-    func remove(satsCardAt offsets: IndexSet) {
-        satsCards.remove(atOffsets: offsets)
-        persist()
-    }
-
-    func remove(satsChipAt offsets: IndexSet) {
-        satsChips.remove(atOffsets: offsets)
         persist()
     }
 

@@ -1,126 +1,19 @@
-//
-//  CardReader.swift
-//  TapsignerDemo
-//
-
 import CKTap
 @preconcurrency import CoreNFC
 import Foundation
-import Observation
 import os
 
-@Observable
-@MainActor
-final class CardReader {
-    enum Operation: Sendable {
-        case read
-        case initialize
-    }
+// MARK: - CardOperation
 
-    var isAskingPIN = false
-    var pin: String = "612370"
-    var pendingOperation: Operation = .read
-    var pendingUninitialized: TapsignerInfo?
-    var lastResult: CardReadResult?
-    var errorMessage: String?
-    var isScanning = false
-
-    @ObservationIgnored
-    private var session: NFCCardSession?
-
-    var pinAlertTitle: String {
-        switch pendingOperation {
-        case .read: return "Card PIN"
-        case .initialize: return "Initialize Tapsigner"
-        }
-    }
-
-    var pinAlertMessage: String {
-        switch pendingOperation {
-        case .read:
-            return "Enter the CVC for Tapsigner. Leave empty for SatsCard."
-        case .initialize:
-            return "Re-enter the Tapsigner CVC. Tapping Scan will initialize the card. This is irreversible."
-        }
-    }
-
-    var pinAlertConfirm: String {
-        switch pendingOperation {
-        case .read: return "Scan"
-        case .initialize: return "Initialize"
-        }
-    }
-
-    func startScan() {
-        Log.ui.info("User tapped Scan NFC")
-        pendingOperation = .read
-        pin = ""
-        isAskingPIN = true
-    }
-
-    /// User answered "No" to the init prompt — keep the partially-read card in the list.
-    func saveUninitialized(_ info: TapsignerInfo) {
-        Log.ui.info("User declined Tapsigner init; saving uninitialized status")
-        pendingUninitialized = nil
-        lastResult = .tapsigner(info)
-    }
-
-    /// User answered "Yes" — request the CVC again and start a second NFC scan that runs `init`.
-    func startInitFlow() {
-        Log.ui.info("User accepted Tapsigner init; requesting CVC")
-        pendingUninitialized = nil
-        pendingOperation = .initialize
-        pin = ""
-        // Delay slightly so the previous alert can fully dismiss before this one appears.
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(350))
-            self?.isAskingPIN = true
-        }
-    }
-
-    func scan() {
-        guard NFCTagReaderSession.readingAvailable else {
-            Log.nfc.error("NFC reading not available on this device")
-            errorMessage = "NFC is not available on this device."
-            return
-        }
-
-        let cvc = pin
-        let operation = pendingOperation
-        Log.ui.info(
-            "Scan confirmed (operation: \(String(describing: operation), privacy: .public), cvc length: \(cvc.count))"
-        )
-        isScanning = true
-
-        let session = NFCCardSession(cvc: cvc, operation: operation) { [weak self] outcome in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.isScanning = false
-                self.session = nil
-                self.pendingOperation = .read
-
-                switch outcome {
-                case .success(let result):
-                    Log.ui.info("Scan success: \(result.title, privacy: .public)")
-                    self.lastResult = result
-                case .uninitialized(let info):
-                    Log.ui.info("Scan returned uninitialized Tapsigner")
-                    self.pendingUninitialized = info
-                case .failure(let message):
-                    Log.ui.error("Scan failure: \(message, privacy: .public)")
-                    self.errorMessage = message
-                case .cancelled:
-                    Log.ui.info("Scan cancelled by user")
-                }
-            }
-        }
-        self.session = session
-        session.begin()
-    }
+nonisolated enum CardOperation: Sendable {
+    case read
+    case initialize
 }
 
-// MARK: - NFCCardSession (non-isolated NFC driver)
+// MARK: - NFCCardSession
 
+/// One-shot NFC driver: starts a tag-reader session, runs a single read or init
+/// against the detected card, and reports the outcome via the completion handler.
 nonisolated final class NFCCardSession:
     NSObject,
     NFCTagReaderSessionDelegate,
@@ -134,7 +27,7 @@ nonisolated final class NFCCardSession:
     }
 
     private let cvc: String
-    private let operation: CardReader.Operation
+    private let operation: CardOperation
     private let completion: @Sendable (Outcome) -> Void
     private let service = CkTapCardService()
 
@@ -144,7 +37,7 @@ nonisolated final class NFCCardSession:
 
     init(
         cvc: String,
-        operation: CardReader.Operation,
+        operation: CardOperation,
         completion: @escaping @Sendable (Outcome) -> Void
     ) {
         self.cvc = cvc
