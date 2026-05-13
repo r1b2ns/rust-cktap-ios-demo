@@ -9,6 +9,7 @@ nonisolated enum CardOperation: Sendable {
     case read
     case initialize
     case fetchXpub(master: Bool)
+    case changePin(newCvc: String)
 }
 
 // MARK: - NFCCardSession
@@ -24,6 +25,7 @@ nonisolated final class NFCCardSession:
         case success(CardReadResult)
         case uninitialized(TapsignerInfo)
         case xpub(String)
+        case pinChanged
         case failure(String)
         case cancelled
     }
@@ -62,6 +64,8 @@ nonisolated final class NFCCardSession:
             prompt = "Hold the Tapsigner near the top of your iPhone to initialize it."
         case .fetchXpub:
             prompt = "Hold the Tapsigner near the top of your iPhone to read its XPUB."
+        case .changePin:
+            prompt = "Hold the Tapsigner near the top of your iPhone to change its PIN."
         }
         session.alertMessage = prompt
         self.session = session
@@ -159,6 +163,18 @@ nonisolated final class NFCCardSession:
                 session.alertMessage = "XPUB read"
                 session.invalidate()
                 finish(.xpub(xpub))
+            case .changePin(let newCvc):
+                session.alertMessage = "Changing PIN…"
+                Log.cktap.info("Starting Tapsigner PIN change")
+                try await service.changeTapsignerPin(
+                    transport: transport,
+                    newCvc: newCvc,
+                    cvc: cvc
+                )
+                Log.cktap.info("Tapsigner PIN changed")
+                session.alertMessage = "PIN changed"
+                session.invalidate()
+                finish(.pinChanged)
             }
         } catch CardReadError.tapsignerNotInitialized(let info) {
             Log.cktap.info("Tapsigner not initialized — surfacing to UI")

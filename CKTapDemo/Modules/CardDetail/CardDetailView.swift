@@ -102,6 +102,39 @@ struct CardDetailView<ViewModel: CardDetailViewModelProtocol>: View {
             Text(xpub)
         }
         .alert(
+            "Change PIN",
+            isPresented: $viewModel.uiState.isAskingChangePin
+        ) {
+            SecureField("Current PIN", text: $viewModel.uiState.currentPin)
+                .textContentType(.password)
+                .keyboardType(.numberPad)
+            SecureField("New PIN (min 6)", text: $viewModel.uiState.newPin)
+                .textContentType(.newPassword)
+                .keyboardType(.numberPad)
+            SecureField("Confirm new PIN", text: $viewModel.uiState.confirmNewPin)
+                .textContentType(.newPassword)
+                .keyboardType(.numberPad)
+
+            Button("Cancel", role: .cancel) {
+                viewModel.cancelChangePinPrompt()
+            }
+            Button("Change") {
+                viewModel.confirmChangePinScan()
+            }
+        } message: {
+            Text("Enter the current Tapsigner CVC and a new one (min 6 characters).")
+        }
+        .alert(
+            "PIN changed",
+            isPresented: $viewModel.uiState.pinChangeSucceeded
+        ) {
+            Button("OK") {
+                viewModel.dismissChangePinSuccess()
+            }
+        } message: {
+            Text("Your Tapsigner PIN was updated. Use the new PIN from now on.")
+        }
+        .alert(
             "Error",
             isPresented: Binding(
                 get: { viewModel.uiState.errorMessage != nil },

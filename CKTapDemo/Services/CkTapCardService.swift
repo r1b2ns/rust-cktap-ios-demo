@@ -42,6 +42,22 @@ nonisolated final class CkTapCardService: Sendable {
         return .tapsigner(try await readTapsigner(tapSigner, cvc: cvc))
     }
 
+    /// Replaces the Tapsigner CVC/PIN. `newCvc` must be at least 6 characters
+    /// (enforced upstream by `rust-cktap`).
+    func changeTapsignerPin(
+        transport: CkTransport,
+        newCvc: String,
+        cvc: String
+    ) async throws {
+        Log.cktap.debug("toCktap: calling SELECT (change flow)…")
+        let card = try await toCktap(transport: transport)
+        guard case .tapSigner(let tapSigner) = card else {
+            Log.cktap.error("change requested but card is not a Tapsigner")
+            throw CkTapError.UnknownCardType
+        }
+        try await tapSigner.change(newCvc: newCvc, cvc: cvc)
+    }
+
     /// Returns the Tapsigner's BIP-32 xpub at either the master level or the
     /// currently-selected derivation path.
     func fetchTapsignerXpub(

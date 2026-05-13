@@ -24,9 +24,17 @@ protocol CardDetailViewModelProtocol: ObservableObject {
     var uiState: CardDetailUiState { get set }
 
     func perform(_ action: TapsignerAction)
+
+    // XPUB flow
     func confirmXpubScan()
     func cancelXpubPrompt()
     func dismissXpub()
+
+    // Change PIN flow
+    func confirmChangePinScan()
+    func cancelChangePinPrompt()
+    func dismissChangePinSuccess()
+
     func dismissError()
 }
 
@@ -35,11 +43,21 @@ protocol CardDetailViewModelProtocol: ObservableObject {
 nonisolated struct CardDetailUiState {
     let card: CardReadResult
 
+    // Shared
+    var isScanning: Bool = false
+    var errorMessage: String?
+
+    // XPUB
     var pin: String = ""
     var isAskingPIN: Bool = false
-    var isScanning: Bool = false
     var fetchedXpub: String?
-    var errorMessage: String?
+
+    // Change PIN
+    var isAskingChangePin: Bool = false
+    var currentPin: String = ""
+    var newPin: String = ""
+    var confirmNewPin: String = ""
+    var pinChangeSucceeded: Bool = false
 
     var title: String { card.title }
 
@@ -67,6 +85,9 @@ final class CardDetailViewModel: CardDetailViewModelProtocol {
 
     private var session: NFCCardSession?
 
+    /// Minimum CVC/PIN length accepted by `rust-cktap`'s `change` command.
+    static let minimumPinLength = 6
+
     init(card: CardReadResult) {
         self.uiState = CardDetailUiState(card: card)
     }
@@ -79,10 +100,11 @@ final class CardDetailViewModel: CardDetailViewModelProtocol {
         case .showXpub:
             requestShowXpub()
         case .changePin:
-            // Implementation lands here as the feature is built.
-            break
+            requestChangePin()
         }
     }
+
+    // MARK: - XPUB
 
     func confirmXpubScan() {
         guard NFCReaderAvailability.isReadingAvailable else {
@@ -115,6 +137,49 @@ final class CardDetailViewModel: CardDetailViewModelProtocol {
         uiState.fetchedXpub = nil
     }
 
+    // MARK: - Change PIN
+
+    func confirmChangePinScan() {
+        if let validation = validateChangePin() {
+            uiState.errorMessage = validation
+            return
+        }
+
+        guard NFCReaderAvailability.isReadingAvailable else {
+            Log.nfc.error("NFC reading not available on this device")
+            uiState.errorMessage = "NFC is not available on this device."
+            return
+        }
+
+        let currentCvc = uiState.currentPin
+        let newCvc = uiState.newPin
+        Log.ui.info(
+            "Change PIN scan confirmed (current length: \(currentCvc.count), new length: \(newCvc.count))"
+        )
+        uiState.isScanning = true
+
+        let session = NFCCardSession(
+            cvc: currentCvc,
+            operation: .changePin(newCvc: newCvc)
+        ) { [weak self] outcome in
+            Task { @MainActor [weak self] in
+                self?.handle(outcome)
+            }
+        }
+        self.session = session
+        session.begin()
+    }
+
+    func cancelChangePinPrompt() {
+        clearChangePinFields()
+    }
+
+    func dismissChangePinSuccess() {
+        uiState.pinChangeSucceeded = false
+    }
+
+    // MARK: - Error
+
     func dismissError() {
         uiState.errorMessage = nil
     }
@@ -126,6 +191,33 @@ final class CardDetailViewModel: CardDetailViewModelProtocol {
         uiState.isAskingPIN = true
     }
 
+    private func requestChangePin() {
+        clearChangePinFields()
+        uiState.isAskingChangePin = true
+    }
+
+    private func clearChangePinFields() {
+        uiState.currentPin = ""
+        uiState.newPin = ""
+        uiState.confirmNewPin = ""
+    }
+
+    private func validateChangePin() -> String? {
+        if uiState.currentPin.isEmpty {
+            return String(localized: "Enter your current PIN.")
+        }
+        if uiState.newPin.count < Self.minimumPinLength {
+            return String(localized: "New PIN must be at least \(Self.minimumPinLength) characters.")
+        }
+        if uiState.newPin != uiState.confirmNewPin {
+            return String(localized: "New PINs don't match.")
+        }
+        if uiState.newPin == uiState.currentPin {
+            return String(localized: "New PIN must be different from the current one.")
+        }
+        return nil
+    }
+
     private func handle(_ outcome: NFCCardSession.Outcome) {
         uiState.isScanning = false
         session = nil
@@ -134,13 +226,17 @@ final class CardDetailViewModel: CardDetailViewModelProtocol {
         case .xpub(let xpub):
             Log.ui.info("XPUB received (len: \(xpub.count))")
             uiState.fetchedXpub = xpub
+        case .pinChanged:
+            Log.ui.info("PIN change succeeded")
+            clearChangePinFields()
+            uiState.pinChangeSucceeded = true
         case .failure(let message):
-            Log.ui.error("XPUB scan failure: \(message, privacy: .public)")
+            Log.ui.error("Tapsigner action failure: \(message, privacy: .public)")
             uiState.errorMessage = message
         case .cancelled:
-            Log.ui.info("XPUB scan cancelled by user")
+            Log.ui.info("Tapsigner action cancelled by user")
         case .success, .uninitialized:
-            Log.ui.info("Unexpected outcome in XPUB flow")
+            Log.ui.info("Unexpected outcome in card-detail flow")
         }
     }
 }
