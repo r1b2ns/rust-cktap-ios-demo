@@ -8,6 +8,7 @@ import os
 nonisolated enum CardOperation: Sendable {
     case read
     case initialize
+    case fetchXpub(master: Bool)
 }
 
 // MARK: - NFCCardSession
@@ -22,6 +23,7 @@ nonisolated final class NFCCardSession:
     enum Outcome: Sendable {
         case success(CardReadResult)
         case uninitialized(TapsignerInfo)
+        case xpub(String)
         case failure(String)
         case cancelled
     }
@@ -58,6 +60,8 @@ nonisolated final class NFCCardSession:
             prompt = "Hold your card near the top of your iPhone."
         case .initialize:
             prompt = "Hold the Tapsigner near the top of your iPhone to initialize it."
+        case .fetchXpub:
+            prompt = "Hold the Tapsigner near the top of your iPhone to read its XPUB."
         }
         session.alertMessage = prompt
         self.session = session
@@ -126,22 +130,36 @@ nonisolated final class NFCCardSession:
         let transport = NFCTransport(tag: tag)
 
         do {
-            let result: CardReadResult
             switch operation {
             case .read:
                 session.alertMessage = "Reading card…"
                 Log.cktap.info("Starting card read")
-                result = try await service.readCardInfo(transport: transport, cvc: cvc)
+                let result = try await service.readCardInfo(transport: transport, cvc: cvc)
+                Log.cktap.info("Operation finished: \(result.title, privacy: .public)")
+                session.alertMessage = "\(result.title) read"
+                session.invalidate()
+                finish(.success(result))
             case .initialize:
                 session.alertMessage = "Initializing Tapsigner…"
                 Log.cktap.info("Starting Tapsigner initialization")
-                result = try await service.initializeTapsigner(transport: transport, cvc: cvc)
+                let result = try await service.initializeTapsigner(transport: transport, cvc: cvc)
+                Log.cktap.info("Operation finished: \(result.title, privacy: .public)")
+                session.alertMessage = "\(result.title) read"
+                session.invalidate()
+                finish(.success(result))
+            case .fetchXpub(let master):
+                session.alertMessage = "Reading XPUB…"
+                Log.cktap.info("Starting Tapsigner xpub fetch (master: \(master, privacy: .public))")
+                let xpub = try await service.fetchTapsignerXpub(
+                    transport: transport,
+                    master: master,
+                    cvc: cvc
+                )
+                Log.cktap.info("XPUB fetched (len: \(xpub.count))")
+                session.alertMessage = "XPUB read"
+                session.invalidate()
+                finish(.xpub(xpub))
             }
-
-            Log.cktap.info("Operation finished: \(result.title, privacy: .public)")
-            session.alertMessage = "\(result.title) read"
-            session.invalidate()
-            finish(.success(result))
         } catch CardReadError.tapsignerNotInitialized(let info) {
             Log.cktap.info("Tapsigner not initialized — surfacing to UI")
             session.alertMessage = "Tapsigner not initialized"

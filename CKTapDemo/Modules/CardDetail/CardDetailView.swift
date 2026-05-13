@@ -53,8 +53,12 @@ struct CardDetailView<ViewModel: CardDetailViewModelProtocol>: View {
         .toolbar {
             if viewModel.uiState.tapsigner != nil {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        viewModel.presentActions()
+                    Menu {
+                        ForEach(TapsignerAction.allCases) { action in
+                            Button(action.title) {
+                                viewModel.perform(action)
+                            }
+                        }
                     } label: {
                         Image(systemName: "ellipsis")
                     }
@@ -62,20 +66,52 @@ struct CardDetailView<ViewModel: CardDetailViewModelProtocol>: View {
                 }
             }
         }
-        .confirmationDialog(
-            "Tapsigner",
-            isPresented: Binding(
-                get: { viewModel.uiState.isActionsPresented },
-                set: { if !$0 { viewModel.dismissActions() } }
-            ),
-            titleVisibility: .hidden
+        .alert(
+            "Tapsigner PIN",
+            isPresented: $viewModel.uiState.isAskingPIN
         ) {
-            ForEach(TapsignerAction.allCases) { action in
-                Button(action.title) {
-                    viewModel.perform(action)
-                }
+            SecureField("CVC / PIN", text: $viewModel.uiState.pin)
+                .textContentType(.password)
+                .keyboardType(.numberPad)
+
+            Button("Cancel", role: .cancel) {
+                viewModel.cancelXpubPrompt()
             }
-            Button("Cancel", role: .cancel) {}
+            Button("Read") {
+                viewModel.confirmXpubScan()
+            }
+        } message: {
+            Text("Enter the Tapsigner CVC to read its XPUB.")
+        }
+        .alert(
+            "XPUB",
+            isPresented: Binding(
+                get: { viewModel.uiState.fetchedXpub != nil },
+                set: { if !$0 { viewModel.dismissXpub() } }
+            ),
+            presenting: viewModel.uiState.fetchedXpub
+        ) { xpub in
+            Button("Copy") {
+                UIPasteboard.general.string = xpub
+                UISelectionFeedbackGenerator().selectionChanged()
+            }
+            Button("OK", role: .cancel) {
+                viewModel.dismissXpub()
+            }
+        } message: { xpub in
+            Text(xpub)
+        }
+        .alert(
+            "Error",
+            isPresented: Binding(
+                get: { viewModel.uiState.errorMessage != nil },
+                set: { if !$0 { viewModel.dismissError() } }
+            ),
+            presenting: viewModel.uiState.errorMessage
+        ) { _ in
+            Button("OK") { viewModel.dismissError() }
+        } message: { message in
+            Text(message)
         }
     }
 }

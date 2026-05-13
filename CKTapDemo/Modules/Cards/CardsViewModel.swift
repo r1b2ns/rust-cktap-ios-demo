@@ -43,6 +43,7 @@ nonisolated struct CardsUiState {
         switch pendingOperation {
         case .read: return "Card PIN"
         case .initialize: return "Initialize Tapsigner"
+        case .fetchXpub: return "Tapsigner PIN"
         }
     }
 
@@ -52,6 +53,8 @@ nonisolated struct CardsUiState {
             return "Enter the CVC for Tapsigner. Leave empty for SatsCard."
         case .initialize:
             return "Re-enter the Tapsigner CVC. Tapping Scan will initialize the card. This is irreversible."
+        case .fetchXpub:
+            return "Enter the Tapsigner CVC to read its XPUB."
         }
     }
 
@@ -59,6 +62,7 @@ nonisolated struct CardsUiState {
         switch pendingOperation {
         case .read: return "Scan"
         case .initialize: return "Initialize"
+        case .fetchXpub: return "Read"
         }
     }
 }
@@ -193,6 +197,8 @@ final class CardsViewModel: CardsViewModelProtocol {
         case .uninitialized(let info):
             Log.ui.info("Scan returned uninitialized Tapsigner")
             uiState.pendingUninitialized = info
+        case .xpub(let xpub):
+            Log.ui.info("Unexpected xpub outcome in Cards module (len: \(xpub.count))")
         case .failure(let message):
             Log.ui.error("Scan failure: \(message, privacy: .public)")
             uiState.errorMessage = message
@@ -207,23 +213,3 @@ final class CardsViewModel: CardsViewModelProtocol {
     }
 }
 
-// MARK: - NFC availability shim
-
-/// Wraps `NFCTagReaderSession.readingAvailable` so the view-model doesn't import CoreNFC.
-private enum NFCReaderAvailability {
-    static var isReadingAvailable: Bool {
-        #if canImport(CoreNFC)
-        return _CoreNFCAvailability.isReadingAvailable
-        #else
-        return false
-        #endif
-    }
-}
-
-#if canImport(CoreNFC)
-import CoreNFC
-
-private enum _CoreNFCAvailability {
-    static var isReadingAvailable: Bool { NFCTagReaderSession.readingAvailable }
-}
-#endif
