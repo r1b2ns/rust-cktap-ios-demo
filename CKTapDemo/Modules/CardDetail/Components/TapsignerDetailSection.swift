@@ -5,7 +5,7 @@ struct TapsignerDetailSection: View {
 
     var body: some View {
         Section("Identity") {
-            DetailRow(label: "Card Ident", value: info.cardIdent, monospaced: true, copyable: true)
+            DetailRow(label: "Card Ident", value: info.cardIdent, monospaced: true)
             DetailRow(label: "Version", value: info.version)
             DetailRow(label: "Status", value: info.isInitialized ? "Initialized" : "Uninitialized")
         }
@@ -22,15 +22,13 @@ struct TapsignerDetailSection: View {
             DetailRow(
                 label: "Card Pubkey",
                 value: info.pubkey,
-                monospaced: true,
-                copyable: true
+                monospaced: true
             )
             if let path = info.path, !path.isEmpty {
                 DetailRow(
                     label: "Derivation Path",
                     value: "m/\(path.map(String.init).joined(separator: "/"))",
-                    monospaced: true,
-                    copyable: true
+                    monospaced: true
                 )
             } else {
                 DetailRow(label: "Derivation Path", value: "—")
@@ -39,8 +37,7 @@ struct TapsignerDetailSection: View {
                 DetailRow(
                     label: "Derived Pubkey",
                     value: derived,
-                    monospaced: true,
-                    copyable: true
+                    monospaced: true
                 )
             }
         }

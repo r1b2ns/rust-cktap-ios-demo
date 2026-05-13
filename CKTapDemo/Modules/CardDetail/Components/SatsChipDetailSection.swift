@@ -5,7 +5,7 @@ struct SatsChipDetailSection: View {
 
     var body: some View {
         Section("Identity") {
-            DetailRow(label: "Card Ident", value: info.cardIdent, monospaced: true, copyable: true)
+            DetailRow(label: "Card Ident", value: info.cardIdent, monospaced: true)
             DetailRow(label: "Version", value: info.version)
         }
 
@@ -17,15 +17,13 @@ struct SatsChipDetailSection: View {
             DetailRow(
                 label: "Card Pubkey",
                 value: info.pubkey,
-                monospaced: true,
-                copyable: true
+                monospaced: true
             )
             if let path = info.path, !path.isEmpty {
                 DetailRow(
                     label: "Derivation Path",
                     value: "m/\(path.map(String.init).joined(separator: "/"))",
-                    monospaced: true,
-                    copyable: true
+                    monospaced: true
                 )
             }
         }

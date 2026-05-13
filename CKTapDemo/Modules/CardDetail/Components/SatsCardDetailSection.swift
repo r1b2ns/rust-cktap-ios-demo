@@ -5,7 +5,7 @@ struct SatsCardDetailSection: View {
 
     var body: some View {
         Section("Identity") {
-            DetailRow(label: "Card Ident", value: info.cardIdent, monospaced: true, copyable: true)
+            DetailRow(label: "Card Ident", value: info.cardIdent, monospaced: true)
             DetailRow(label: "Version", value: info.version)
         }
 
@@ -21,15 +21,13 @@ struct SatsCardDetailSection: View {
             DetailRow(
                 label: "Card Pubkey",
                 value: info.pubkey,
-                monospaced: true,
-                copyable: true
+                monospaced: true
             )
             if let address = info.address {
                 DetailRow(
                     label: "Active Address",
                     value: address,
-                    monospaced: true,
-                    copyable: true
+                    monospaced: true
                 )
             }
         }
