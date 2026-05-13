@@ -1,14 +1,12 @@
 //
-//  TapsignerDemoApp.swift
-//  TapsignerDemo
-//
-//  Created by Rubens Machion on 12/05/26.
+//  CKTapDemoApp.swift
+//  CKTapDemo
 //
 
 import SwiftUI
 
 @main
-struct TapsignerDemoApp: App {
+struct CKTapDemoApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()

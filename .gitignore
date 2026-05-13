@@ -8,6 +8,7 @@ Icon
 .Trashes
 
 # Xcode
+*.xcodeproj/
 build/
 DerivedData/
 *.xcuserdatad/

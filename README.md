@@ -35,8 +35,15 @@ iOS demo app for reading **Coinkite** cards (Tapsigner, SatsCard, SatsChip) over
    ```
    The xcframework must have `CKTapFFI.h` and `module.modulemap` (declaring `module CKTapFFI`) directly under each slice's `Headers/` directory — not nested under `Headers/cktap_ffiFFI/`.
 
-3. **Open and run:**
-   - Open `TapsignerDemo.xcodeproj` in Xcode.
+3. **Generate the Xcode project with XcodeGen:**
+   ```sh
+   brew install xcodegen   # if you don't have it
+   xcodegen generate       # reads project.yml at the repo root
+   ```
+   The `.xcodeproj` is regenerated from `project.yml`, so re-run `xcodegen generate` whenever you add or remove a source file.
+
+4. **Open and run:**
+   - Open `CKTapDemo.xcodeproj` in Xcode.
    - Select a connected physical iPhone.
    - Build & Run. Tap **Scan NFC**, enter the card CVC (6 digits printed on the back), and hold the card against the top of the iPhone.
 
