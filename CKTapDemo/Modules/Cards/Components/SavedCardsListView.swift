@@ -6,6 +6,9 @@ struct SavedCardsListView: View {
     let satsChips: [SatsChipInfo]
     let isScanning: Bool
     let onScan: () -> Void
+    let onSelectTapsigner: (TapsignerInfo) -> Void
+    let onSelectSatsCard: (SatsCardSavedInfo) -> Void
+    let onSelectSatsChip: (SatsChipInfo) -> Void
     let onRemoveTapsigner: (String) -> Void
     let onRemoveSatsCard: (String) -> Void
     let onRemoveSatsChip: (String) -> Void
@@ -15,14 +18,19 @@ struct SavedCardsListView: View {
             if !tapsigners.isEmpty {
                 Section("Tapsigner") {
                     ForEach(tapsigners) { card in
-                        TapsignerRow(card: card)
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button(role: .destructive) {
-                                    onRemoveTapsigner(card.id)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
+                        Button {
+                            onSelectTapsigner(card)
+                        } label: {
+                            TapsignerRow(card: card)
+                        }
+                        .buttonStyle(.plain)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                onRemoveTapsigner(card.id)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
                             }
+                        }
                     }
                 }
             }
@@ -30,14 +38,19 @@ struct SavedCardsListView: View {
             if !satsCards.isEmpty {
                 Section("SatsCard") {
                     ForEach(satsCards) { card in
-                        SatsCardRow(card: card)
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button(role: .destructive) {
-                                    onRemoveSatsCard(card.id)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
+                        Button {
+                            onSelectSatsCard(card)
+                        } label: {
+                            SatsCardRow(card: card)
+                        }
+                        .buttonStyle(.plain)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                onRemoveSatsCard(card.id)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
                             }
+                        }
                     }
                 }
             }
@@ -45,14 +58,19 @@ struct SavedCardsListView: View {
             if !satsChips.isEmpty {
                 Section("SatsChip") {
                     ForEach(satsChips) { card in
-                        SatsChipRow(card: card)
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button(role: .destructive) {
-                                    onRemoveSatsChip(card.id)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
+                        Button {
+                            onSelectSatsChip(card)
+                        } label: {
+                            SatsChipRow(card: card)
+                        }
+                        .buttonStyle(.plain)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                onRemoveSatsChip(card.id)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
                             }
+                        }
                     }
                 }
             }

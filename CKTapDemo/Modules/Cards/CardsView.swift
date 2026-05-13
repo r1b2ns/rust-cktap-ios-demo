@@ -112,6 +112,9 @@ struct CardsView<ViewModel: CardsViewModelProtocol>: View {
                 satsChips: viewModel.uiState.satsChips,
                 isScanning: viewModel.uiState.isScanning,
                 onScan: viewModel.startScan,
+                onSelectTapsigner: { coordinator.navigateToDetail(.tapsigner($0)) },
+                onSelectSatsCard: { coordinator.navigateToDetail(.satsCard($0)) },
+                onSelectSatsChip: { coordinator.navigateToDetail(.satsChip($0)) },
                 onRemoveTapsigner: viewModel.removeTapsigner(id:),
                 onRemoveSatsCard: viewModel.removeSatsCard(id:),
                 onRemoveSatsChip: viewModel.removeSatsChip(id:)
@@ -125,8 +128,11 @@ struct CardsView<ViewModel: CardsViewModelProtocol>: View {
 private extension View {
     @ViewBuilder
     func navigationDestinations() -> some View {
-        self.navigationDestination(for: CardsRoute.self) { _ in
-            EmptyView()
+        self.navigationDestination(for: CardsRoute.self) { route in
+            switch route {
+            case .cardDetail(let card):
+                CardDetailViewFactory.build(card: card)
+            }
         }
     }
 }

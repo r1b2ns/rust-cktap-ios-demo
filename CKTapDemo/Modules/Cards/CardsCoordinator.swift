@@ -4,10 +4,9 @@ import SwiftUI
 // MARK: - Route
 
 /// Navigation destinations within the Cards module.
-///
-/// Empty for now — UI flows are handled via alerts. Add new cases here when
-/// pushing detail screens onto the stack.
-enum CardsRoute: Hashable {}
+enum CardsRoute: Hashable {
+    case cardDetail(CardReadResult)
+}
 
 // MARK: - Coordinator
 
@@ -18,4 +17,10 @@ enum CardsRoute: Hashable {}
 final class CardsCoordinator: MainCoordinatorProtocol {
 
     @Published var path = NavigationPath()
+
+    // MARK: - Navigation
+
+    func navigateToDetail(_ card: CardReadResult) {
+        path.append(CardsRoute.cardDetail(card))
+    }
 }
