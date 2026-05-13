@@ -50,6 +50,33 @@ struct CardDetailView<ViewModel: CardDetailViewModelProtocol>: View {
         }
         .navigationTitle(viewModel.uiState.title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if viewModel.uiState.tapsigner != nil {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        viewModel.presentActions()
+                    } label: {
+                        Image(systemName: "ellipsis")
+                    }
+                    .accessibilityLabel("Tapsigner actions")
+                }
+            }
+        }
+        .confirmationDialog(
+            "Tapsigner",
+            isPresented: Binding(
+                get: { viewModel.uiState.isActionsPresented },
+                set: { if !$0 { viewModel.dismissActions() } }
+            ),
+            titleVisibility: .hidden
+        ) {
+            ForEach(TapsignerAction.allCases) { action in
+                Button(action.title) {
+                    viewModel.perform(action)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        }
     }
 }
 
