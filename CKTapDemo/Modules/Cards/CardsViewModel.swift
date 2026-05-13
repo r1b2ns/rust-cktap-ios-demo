@@ -140,13 +140,18 @@ final class CardsViewModel: CardsViewModelProtocol {
     }
 
     func startInitFlow() {
-        Log.ui.info("User accepted Tapsigner init; requesting CVC")
         uiState.pendingUninitialized = nil
         uiState.pendingOperation = .initialize
-        uiState.pin = ""
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(350))
-            self?.uiState.isAskingPIN = true
+
+        if uiState.pin.isEmpty {
+            Log.ui.info("User accepted Tapsigner init; CVC missing, asking again")
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(350))
+                self?.uiState.isAskingPIN = true
+            }
+        } else {
+            Log.ui.info("User accepted Tapsigner init; reusing entered CVC")
+            confirmScan()
         }
     }
 

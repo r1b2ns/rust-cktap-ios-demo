@@ -32,11 +32,33 @@ targets:
       - path: CKTapDemo
         excludes:
           - "Info.plist"
+    info:
+      path: CKTapDemo/Info.plist
+      properties:
+        LSRequiresIPhoneOS: true
+        NFCReaderUsageDescription: This app uses NFC to communicate with your Tapsigner or SatsCard.
+        com.apple.developer.nfc.readersession.iso7816.select-identifiers:
+          - F0436F696E6B697465434152447631
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: true
+        UIApplicationSupportsIndirectInputEvents: true
+        UILaunchStoryboardName: LaunchScreen
+        UIRequiredDeviceCapabilities:
+          - arm64
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        ITSAppUsesNonExemptEncryption: false
     settings:
       base:
         PRODUCT_NAME: CKTapDemo
         PRODUCT_BUNDLE_IDENTIFIER: zeroSixteen.br.com.CKTapDemo
-        INFOPLIST_FILE: CKTapDemo/Info.plist
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_ENTITLEMENTS: CKTapDemo/CKTapDemo.entitlements
         CODE_SIGN_STYLE: Automatic

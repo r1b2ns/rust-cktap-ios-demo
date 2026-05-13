@@ -148,9 +148,12 @@ nonisolated final class NFCCardSession:
             session.invalidate()
             finish(.uninitialized(info))
         } catch {
-            Log.cktap.error("Operation failed: \(error.localizedDescription, privacy: .public)")
-            session.invalidate(errorMessage: error.localizedDescription)
-            finish(.failure(error.localizedDescription))
+            let message = CKTapErrorFormatter.userMessage(for: error)
+            Log.cktap.error(
+                "Operation failed: \(String(reflecting: error), privacy: .public) -> \(message, privacy: .public)"
+            )
+            session.invalidate(errorMessage: message)
+            finish(.failure(message))
         }
     }
 
