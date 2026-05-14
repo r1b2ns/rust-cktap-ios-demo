@@ -31,6 +31,8 @@ nonisolated enum CKTapErrorFormatter {
             return unwrap(dumpError)
         case let signError as SignPsbtError:
             return unwrap(signError)
+        case let signError as SignDigestError:
+            return unwrap(signError)
         case let keyError as KeyError:
             return message(forKey: keyError)
         default:
@@ -166,6 +168,16 @@ nonisolated enum CKTapErrorFormatter {
             return String(localized: "Slot \(slot) is unused.")
         @unknown default:
             return error.localizedDescription
+        }
+    }
+
+    private static func unwrap(_ error: SignDigestError) -> String {
+        switch error {
+        case .CkTap(let inner): return message(forCkTap: inner)
+        case .InvalidDigestLength(let len):
+            return String(localized: "Invalid digest length: \(len) bytes (expected 32).")
+        case .RecoveryId(let msg):
+            return String(localized: "Could not recover signature pubkey: \(msg)")
         }
     }
 

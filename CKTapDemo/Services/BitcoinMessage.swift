@@ -19,6 +19,24 @@ nonisolated enum BitcoinMessage {
         return second
     }
 
+    /// Encodes a recoverable ECDSA signature as a base64 BIP-137 "Bitcoin
+    /// Signed Message" signature: `[27 + recId + 4] || r (32) || s (32)`.
+    ///
+    /// The `+ 4` flag marks the pubkey as compressed (P2PKH), which is what
+    /// Tapsigner produces.
+    static func encodeBIP137Signature(rs: Data, recId: UInt8) throws -> String {
+        guard rs.count == 64 else {
+            throw MessageSigningError.invalidSignatureLength(rs.count)
+        }
+        guard recId < 4 else {
+            throw MessageSigningError.invalidRecoveryId(recId)
+        }
+        var out = Data(capacity: 65)
+        out.append(27 + recId + 4)
+        out.append(rs)
+        return out.base64EncodedString()
+    }
+
     private static func varint(_ n: UInt64) -> [UInt8] {
         if n < 0xfd {
             return [UInt8(n)]

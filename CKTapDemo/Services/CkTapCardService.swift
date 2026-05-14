@@ -59,11 +59,7 @@ nonisolated final class CkTapCardService: Sendable {
     }
 
     /// Signs an arbitrary text message using BIP-137 ("Bitcoin Signed Message")
-    /// digest format.
-    ///
-    /// The Tapsigner FFI doesn't expose the raw `signDigest` command yet —
-    /// tracked upstream as https://github.com/bitcoindevkit/rust-cktap/issues/70.
-    /// Once it lands, replace the `throw` with the real call.
+    /// digest format. Signs with the Tapsigner master key (empty subPath).
     func signTapsignerMessage(
         transport: CkTransport,
         message: String,
@@ -76,25 +72,28 @@ nonisolated final class CkTapCardService: Sendable {
             throw CkTapError.UnknownCardType
         }
 
-        // Compute the BIP-137 digest now so the implementation stays close to
-        // the call site that will eventually use it.
         let digest = BitcoinMessage.digest(message)
         Log.cktap.debug("BIP-137 digest computed (\(digest.count) bytes)")
 
-        // TODO(rust-cktap#70): replace this throw with the real signing call:
-        //
-        //     let result = try await tapSigner.signDigest(
-        //         digest: digest,
-        //         subPath: [],
-        //         cvc: cvc
-        //     )
-        //     return SignedMessage(
-        //         message: message,
-        //         signature: result.signature.base64EncodedString()
-        //     )
-        _ = tapSigner
-        _ = cvc
-        throw MessageSigningError.notImplemented
+        let result = try await tapSigner.signDigest(
+            digest: digest,
+            subPath: [],
+            cvc: cvc
+        )
+        Log.cktap.info(
+            "signDigest returned (sig: \(result.signature.count)B, pub: \(result.pubkey.count)B, recId: \(result.recId, privacy: .public))"
+        )
+
+        let signatureBase64 = try BitcoinMessage.encodeBIP137Signature(
+            rs: result.signature,
+            recId: result.recId
+        )
+        let pubkeyHex = result.pubkey.map { String(format: "%02x", $0) }.joined()
+        return SignedMessage(
+            message: message,
+            signature: signatureBase64,
+            pubkey: pubkeyHex
+        )
     }
 
     /// Returns the Tapsigner's BIP-32 xpub at either the master level or the

@@ -192,15 +192,19 @@ private struct SignMessageAlerts<ViewModel: CardDetailViewModelProtocol>: ViewMo
                 ),
                 presenting: viewModel.uiState.fetchedSignature
             ) { signed in
-                Button("Copy") {
+                Button("Copy signature") {
                     UIPasteboard.general.string = signed.signature
+                    UISelectionFeedbackGenerator().selectionChanged()
+                }
+                Button("Copy pubkey") {
+                    UIPasteboard.general.string = signed.pubkey
                     UISelectionFeedbackGenerator().selectionChanged()
                 }
                 Button("OK", role: .cancel) {
                     viewModel.dismissSignature()
                 }
             } message: { signed in
-                Text(signed.signature)
+                Text("Signature (BIP-137, base64):\n\(signed.signature)\n\nPubkey:\n\(signed.pubkey)")
             }
     }
 }
