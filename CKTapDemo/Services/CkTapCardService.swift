@@ -96,6 +96,28 @@ nonisolated final class CkTapCardService: Sendable {
         )
     }
 
+    /// Runs the TAPSIGNER `derive` command at the given (unhardened) path.
+    ///
+    /// `rust-cktap` applies the BIP-32 hardening bit internally and verifies
+    /// the response signature against the message:
+    /// `"OPENDIME" || card_nonce || app_nonce || chain_code`. A failure here
+    /// means the signature verification did NOT pass — exactly the scenario
+    /// described in https://github.com/coinkite/coinkite-tap-proto/issues/56.
+    func deriveTapsigner(
+        transport: CkTransport,
+        path: [UInt32],
+        cvc: String
+    ) async throws -> DerivedPubkey {
+        Log.cktap.debug("toCktap: calling SELECT (derive flow)…")
+        let card = try await toCktap(transport: transport)
+        guard case .tapSigner(let tapSigner) = card else {
+            Log.cktap.error("derive requested but card is not a Tapsigner")
+            throw CkTapError.UnknownCardType
+        }
+        let pubkey = try await tapSigner.derive(path: path, cvc: cvc)
+        return DerivedPubkey(path: path, pubkey: pubkey)
+    }
+
     /// Returns the Tapsigner's BIP-32 xpub at either the master level or the
     /// currently-selected derivation path.
     func fetchTapsignerXpub(

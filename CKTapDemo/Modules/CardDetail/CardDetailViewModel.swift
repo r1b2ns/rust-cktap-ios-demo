@@ -8,14 +8,32 @@ enum TapsignerAction: String, Identifiable, CaseIterable {
     case signMessage
     case showXpub
     case changePin
+    case deriveAtPath
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .signMessage: return String(localized: "Sign message")
-        case .showXpub:    return String(localized: "Show XPUB")
-        case .changePin:   return String(localized: "Change PIN")
+        case .signMessage:   return String(localized: "Sign message")
+        case .showXpub:      return String(localized: "Show XPUB")
+        case .changePin:     return String(localized: "Change PIN")
+        case .deriveAtPath:  return String(localized: "Derive at path")
+        }
+    }
+}
+
+// MARK: - DerivePathParseError
+
+enum DerivePathParseError: Error {
+    case invalidComponent(String)
+    case componentTooLarge(String)
+
+    var userMessage: String {
+        switch self {
+        case .invalidComponent(let raw):
+            return String(localized: "Invalid path component: \"\(raw)\". Use digits separated by /.")
+        case .componentTooLarge(let raw):
+            return String(localized: "Component \"\(raw)\" is too large. Use the unhardened number (e.g. 48, not 0x80000030).")
         }
     }
 }
@@ -41,6 +59,11 @@ protocol CardDetailViewModelProtocol: ObservableObject {
     func confirmSignMessageScan()
     func cancelSignMessagePrompt()
     func dismissSignature()
+
+    // Derive at path flow
+    func confirmDeriveScan()
+    func cancelDerivePrompt()
+    func dismissDerivedPubkey()
 
     func dismissError()
 }
@@ -71,6 +94,12 @@ nonisolated struct CardDetailUiState {
     var signMessageText: String = ""
     var signMessagePin: String = ""
     var fetchedSignature: SignedMessage?
+
+    // Derive at path
+    var isAskingDerive: Bool = false
+    var derivePathInput: String = ""
+    var derivePin: String = ""
+    var derivedResult: DerivedPubkey?
 
     var title: String { card.title }
 
@@ -116,6 +145,8 @@ final class CardDetailViewModel: CardDetailViewModelProtocol {
             requestChangePin()
         case .signMessage:
             requestSignMessage()
+        case .deriveAtPath:
+            requestDerive()
         }
     }
 
@@ -234,6 +265,52 @@ final class CardDetailViewModel: CardDetailViewModelProtocol {
         uiState.fetchedSignature = nil
     }
 
+    // MARK: - Derive at path
+
+    func confirmDeriveScan() {
+        let path: [UInt32]
+        do {
+            path = try Self.parseDerivationPath(uiState.derivePathInput)
+        } catch let error as DerivePathParseError {
+            uiState.errorMessage = error.userMessage
+            return
+        } catch {
+            uiState.errorMessage = error.localizedDescription
+            return
+        }
+
+        guard NFCReaderAvailability.isReadingAvailable else {
+            Log.nfc.error("NFC reading not available on this device")
+            uiState.errorMessage = "NFC is not available on this device."
+            return
+        }
+
+        let cvc = uiState.derivePin
+        Log.ui.info(
+            "Derive scan confirmed (path components: \(path.count), cvc length: \(cvc.count))"
+        )
+        uiState.isScanning = true
+
+        let session = NFCCardSession(
+            cvc: cvc,
+            operation: .derive(path: path)
+        ) { [weak self] outcome in
+            Task { @MainActor [weak self] in
+                self?.handle(outcome)
+            }
+        }
+        self.session = session
+        session.begin()
+    }
+
+    func cancelDerivePrompt() {
+        clearDeriveFields()
+    }
+
+    func dismissDerivedPubkey() {
+        uiState.derivedResult = nil
+    }
+
     // MARK: - Error
 
     func dismissError() {
@@ -257,6 +334,19 @@ final class CardDetailViewModel: CardDetailViewModelProtocol {
         uiState.isAskingSignMessage = true
     }
 
+    private func requestDerive() {
+        clearDeriveFields()
+        // Pre-fill a common multisig path that triggers the bug described in
+        // https://github.com/coinkite/coinkite-tap-proto/issues/56 on real cards.
+        uiState.derivePathInput = "48/0/0"
+        uiState.isAskingDerive = true
+    }
+
+    private func clearDeriveFields() {
+        uiState.derivePathInput = ""
+        uiState.derivePin = ""
+    }
+
     private func clearChangePinFields() {
         uiState.currentPin = ""
         uiState.newPin = ""
@@ -266,6 +356,39 @@ final class CardDetailViewModel: CardDetailViewModelProtocol {
     private func clearSignMessageFields() {
         uiState.signMessageText = ""
         uiState.signMessagePin = ""
+    }
+
+    /// Parses a user-typed derivation path like "48/0/0", "m/48/0/0",
+    /// "48h/0h/0h" or "48'/0'/0'" into the unhardened components expected by
+    /// `tapSigner.derive(path:cvc:)` (rust-cktap applies the hardening bit
+    /// internally — see `lib/src/tap_signer.rs:251`).
+    ///
+    /// An empty input parses to `[]`, which corresponds to deriving the master
+    /// key (`m`) — the only path that is known to verify on real cards today
+    /// (see https://github.com/coinkite/coinkite-tap-proto/issues/56).
+    static func parseDerivationPath(_ input: String) throws -> [UInt32] {
+        var trimmed = input.trimmingCharacters(in: .whitespaces)
+        if trimmed.hasPrefix("m/") { trimmed.removeFirst(2) }
+        if trimmed == "m" || trimmed.isEmpty { return [] }
+
+        let components = trimmed.split(whereSeparator: { $0 == "/" || $0 == "," })
+        var result: [UInt32] = []
+        for raw in components {
+            var token = raw.trimmingCharacters(in: .whitespaces)
+            guard !token.isEmpty else { continue }
+            if token.hasSuffix("h") || token.hasSuffix("H") || token.hasSuffix("'") {
+                token.removeLast()
+            }
+            guard let value = UInt32(token) else {
+                throw DerivePathParseError.invalidComponent(String(raw))
+            }
+            // Hardening bit is applied inside rust-cktap; reject already-hardened input.
+            guard value < 0x8000_0000 else {
+                throw DerivePathParseError.componentTooLarge(String(raw))
+            }
+            result.append(value)
+        }
+        return result
     }
 
     private func validateChangePin() -> String? {
@@ -300,6 +423,10 @@ final class CardDetailViewModel: CardDetailViewModelProtocol {
             Log.ui.info("Message signed (sig len: \(signed.signature.count))")
             clearSignMessageFields()
             uiState.fetchedSignature = signed
+        case .derived(let derived):
+            Log.ui.info("Derive succeeded (pubkey len: \(derived.pubkey.count))")
+            clearDeriveFields()
+            uiState.derivedResult = derived
         case .failure(let message):
             Log.ui.error("Tapsigner action failure: \(message, privacy: .public)")
             uiState.errorMessage = message

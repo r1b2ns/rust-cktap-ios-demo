@@ -11,6 +11,7 @@ nonisolated enum CardOperation: Sendable {
     case fetchXpub(master: Bool)
     case changePin(newCvc: String)
     case signMessage(message: String)
+    case derive(path: [UInt32])
 }
 
 // MARK: - NFCCardSession
@@ -28,6 +29,7 @@ nonisolated final class NFCCardSession:
         case xpub(String)
         case pinChanged
         case signed(SignedMessage)
+        case derived(DerivedPubkey)
         case failure(String)
         case cancelled
     }
@@ -70,6 +72,8 @@ nonisolated final class NFCCardSession:
             prompt = "Hold the Tapsigner near the top of your iPhone to change its PIN."
         case .signMessage:
             prompt = "Hold the Tapsigner near the top of your iPhone to sign the message."
+        case .derive:
+            prompt = "Hold the Tapsigner near the top of your iPhone to derive the pubkey."
         }
         session.alertMessage = prompt
         self.session = session
@@ -190,6 +194,20 @@ nonisolated final class NFCCardSession:
                 Log.cktap.info("Message signed")
                 session.invalidate()
                 finish(.signed(signed))
+            case .derive(let path):
+                session.alertMessage = "Deriving pubkey…"
+                Log.cktap.info(
+                    "Starting Tapsigner derive (path components: \(path.count, privacy: .public))"
+                )
+                let derived = try await service.deriveTapsigner(
+                    transport: transport,
+                    path: path,
+                    cvc: cvc
+                )
+                Log.cktap.info("Derive succeeded (pubkey len: \(derived.pubkey.count))")
+                session.alertMessage = "Pubkey derived"
+                session.invalidate()
+                finish(.derived(derived))
             }
         } catch CardReadError.tapsignerNotInitialized(let info) {
             Log.cktap.info("Tapsigner not initialized — surfacing to UI")

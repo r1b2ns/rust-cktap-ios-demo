@@ -69,6 +69,7 @@ struct CardDetailView<ViewModel: CardDetailViewModelProtocol>: View {
         .modifier(XpubAlerts(viewModel: viewModel))
         .modifier(ChangePinAlerts(viewModel: viewModel))
         .modifier(SignMessageAlerts(viewModel: viewModel))
+        .modifier(DeriveAlerts(viewModel: viewModel))
         .modifier(ErrorAlertModifier(viewModel: viewModel))
     }
 }
@@ -205,6 +206,55 @@ private struct SignMessageAlerts<ViewModel: CardDetailViewModelProtocol>: ViewMo
                 }
             } message: { signed in
                 Text("Signature (BIP-137, base64):\n\(signed.signature)\n\nPubkey:\n\(signed.pubkey)")
+            }
+    }
+}
+
+private struct DeriveAlerts<ViewModel: CardDetailViewModelProtocol>: ViewModifier {
+    @ObservedObject var viewModel: ViewModel
+
+    func body(content: Content) -> some View {
+        content
+            .alert(
+                "Derive at path",
+                isPresented: $viewModel.uiState.isAskingDerive
+            ) {
+                TextField("Path (e.g. 48/0/0)", text: $viewModel.uiState.derivePathInput)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .keyboardType(.numbersAndPunctuation)
+                SecureField("CVC / PIN", text: $viewModel.uiState.derivePin)
+                    .textContentType(.password)
+                    .keyboardType(.numberPad)
+
+                Button("Cancel", role: .cancel) {
+                    viewModel.cancelDerivePrompt()
+                }
+                Button("Derive") {
+                    viewModel.confirmDeriveScan()
+                }
+            } message: {
+                Text(
+                    "Empty path = master (m). Components are hardened automatically. Triggers rust-cktap signature verification (issue #56)."
+                )
+            }
+            .alert(
+                "Derived pubkey",
+                isPresented: Binding(
+                    get: { viewModel.uiState.derivedResult != nil },
+                    set: { if !$0 { viewModel.dismissDerivedPubkey() } }
+                ),
+                presenting: viewModel.uiState.derivedResult
+            ) { derived in
+                Button("Copy pubkey") {
+                    UIPasteboard.general.string = derived.pubkey
+                    UISelectionFeedbackGenerator().selectionChanged()
+                }
+                Button("OK", role: .cancel) {
+                    viewModel.dismissDerivedPubkey()
+                }
+            } message: { derived in
+                Text("\(derived.pathDisplay)\n\(derived.pubkey)")
             }
     }
 }
