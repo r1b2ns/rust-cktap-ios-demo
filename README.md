@@ -2,6 +2,11 @@
 
 iOS demo app for reading **Coinkite** cards (Tapsigner, SatsCard, SatsChip) over NFC using [rust-cktap](https://github.com/rust-cktap/rust-cktap) (Swift bindings: [`cktap-swift`](../rust-cktap/cktap-swift)).
 
+## TestFlight
+
+Try the latest build without setting up the toolchain:
+👉 [Join the TestFlight beta](https://testflight.apple.com/join/jBWyCA3w)
+
 ## Requirements
 
 - Xcode 26.4+
