@@ -66,75 +66,150 @@ struct CardDetailView<ViewModel: CardDetailViewModelProtocol>: View {
                 }
             }
         }
-        .alert(
-            "Tapsigner PIN",
-            isPresented: $viewModel.uiState.isAskingPIN
-        ) {
-            SecureField("CVC / PIN", text: $viewModel.uiState.pin)
-                .textContentType(.password)
-                .keyboardType(.numberPad)
+        .modifier(XpubAlerts(viewModel: viewModel))
+        .modifier(ChangePinAlerts(viewModel: viewModel))
+        .modifier(SignMessageAlerts(viewModel: viewModel))
+        .modifier(ErrorAlertModifier(viewModel: viewModel))
+    }
+}
 
-            Button("Cancel", role: .cancel) {
-                viewModel.cancelXpubPrompt()
-            }
-            Button("Read") {
-                viewModel.confirmXpubScan()
-            }
-        } message: {
-            Text("Enter the Tapsigner CVC to read its XPUB.")
-        }
-        .alert(
-            "XPUB",
-            isPresented: Binding(
-                get: { viewModel.uiState.fetchedXpub != nil },
-                set: { if !$0 { viewModel.dismissXpub() } }
-            ),
-            presenting: viewModel.uiState.fetchedXpub
-        ) { xpub in
-            Button("Copy") {
-                UIPasteboard.general.string = xpub
-                UISelectionFeedbackGenerator().selectionChanged()
-            }
-            Button("OK", role: .cancel) {
-                viewModel.dismissXpub()
-            }
-        } message: { xpub in
-            Text(xpub)
-        }
-        .alert(
-            "Change PIN",
-            isPresented: $viewModel.uiState.isAskingChangePin
-        ) {
-            SecureField("Current PIN", text: $viewModel.uiState.currentPin)
-                .textContentType(.password)
-                .keyboardType(.numberPad)
-            SecureField("New PIN (min 6)", text: $viewModel.uiState.newPin)
-                .textContentType(.newPassword)
-                .keyboardType(.numberPad)
-            SecureField("Confirm new PIN", text: $viewModel.uiState.confirmNewPin)
-                .textContentType(.newPassword)
-                .keyboardType(.numberPad)
+// MARK: - Alert modifiers
 
-            Button("Cancel", role: .cancel) {
-                viewModel.cancelChangePinPrompt()
+private struct XpubAlerts<ViewModel: CardDetailViewModelProtocol>: ViewModifier {
+    @ObservedObject var viewModel: ViewModel
+
+    func body(content: Content) -> some View {
+        content
+            .alert(
+                "Tapsigner PIN",
+                isPresented: $viewModel.uiState.isAskingPIN
+            ) {
+                SecureField("CVC / PIN", text: $viewModel.uiState.pin)
+                    .textContentType(.password)
+                    .keyboardType(.numberPad)
+
+                Button("Cancel", role: .cancel) {
+                    viewModel.cancelXpubPrompt()
+                }
+                Button("Read") {
+                    viewModel.confirmXpubScan()
+                }
+            } message: {
+                Text("Enter the Tapsigner CVC to read its XPUB.")
             }
-            Button("Change") {
-                viewModel.confirmChangePinScan()
+            .alert(
+                "XPUB",
+                isPresented: Binding(
+                    get: { viewModel.uiState.fetchedXpub != nil },
+                    set: { if !$0 { viewModel.dismissXpub() } }
+                ),
+                presenting: viewModel.uiState.fetchedXpub
+            ) { xpub in
+                Button("Copy") {
+                    UIPasteboard.general.string = xpub
+                    UISelectionFeedbackGenerator().selectionChanged()
+                }
+                Button("OK", role: .cancel) {
+                    viewModel.dismissXpub()
+                }
+            } message: { xpub in
+                Text(xpub)
             }
-        } message: {
-            Text("Enter the current Tapsigner CVC and a new one (min 6 characters).")
-        }
-        .alert(
-            "PIN changed",
-            isPresented: $viewModel.uiState.pinChangeSucceeded
-        ) {
-            Button("OK") {
-                viewModel.dismissChangePinSuccess()
+    }
+}
+
+private struct ChangePinAlerts<ViewModel: CardDetailViewModelProtocol>: ViewModifier {
+    @ObservedObject var viewModel: ViewModel
+
+    func body(content: Content) -> some View {
+        content
+            .alert(
+                "Change PIN",
+                isPresented: $viewModel.uiState.isAskingChangePin
+            ) {
+                SecureField("Current PIN", text: $viewModel.uiState.currentPin)
+                    .textContentType(.password)
+                    .keyboardType(.numberPad)
+                SecureField("New PIN (min 6)", text: $viewModel.uiState.newPin)
+                    .textContentType(.newPassword)
+                    .keyboardType(.numberPad)
+                SecureField("Confirm new PIN", text: $viewModel.uiState.confirmNewPin)
+                    .textContentType(.newPassword)
+                    .keyboardType(.numberPad)
+
+                Button("Cancel", role: .cancel) {
+                    viewModel.cancelChangePinPrompt()
+                }
+                Button("Change") {
+                    viewModel.confirmChangePinScan()
+                }
+            } message: {
+                Text("Enter the current Tapsigner CVC and a new one (min 6 characters).")
             }
-        } message: {
-            Text("Your Tapsigner PIN was updated. Use the new PIN from now on.")
-        }
-        .alert(
+            .alert(
+                "PIN changed",
+                isPresented: $viewModel.uiState.pinChangeSucceeded
+            ) {
+                Button("OK") {
+                    viewModel.dismissChangePinSuccess()
+                }
+            } message: {
+                Text("Your Tapsigner PIN was updated. Use the new PIN from now on.")
+            }
+    }
+}
+
+private struct SignMessageAlerts<ViewModel: CardDetailViewModelProtocol>: ViewModifier {
+    @ObservedObject var viewModel: ViewModel
+
+    func body(content: Content) -> some View {
+        content
+            .alert(
+                "Sign message",
+                isPresented: $viewModel.uiState.isAskingSignMessage
+            ) {
+                TextField("Message", text: $viewModel.uiState.signMessageText)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                SecureField("CVC / PIN", text: $viewModel.uiState.signMessagePin)
+                    .textContentType(.password)
+                    .keyboardType(.numberPad)
+
+                Button("Cancel", role: .cancel) {
+                    viewModel.cancelSignMessagePrompt()
+                }
+                Button("Sign") {
+                    viewModel.confirmSignMessageScan()
+                }
+            } message: {
+                Text("Enter a message and your Tapsigner CVC.")
+            }
+            .alert(
+                "Signature",
+                isPresented: Binding(
+                    get: { viewModel.uiState.fetchedSignature != nil },
+                    set: { if !$0 { viewModel.dismissSignature() } }
+                ),
+                presenting: viewModel.uiState.fetchedSignature
+            ) { signed in
+                Button("Copy") {
+                    UIPasteboard.general.string = signed.signature
+                    UISelectionFeedbackGenerator().selectionChanged()
+                }
+                Button("OK", role: .cancel) {
+                    viewModel.dismissSignature()
+                }
+            } message: { signed in
+                Text(signed.signature)
+            }
+    }
+}
+
+private struct ErrorAlertModifier<ViewModel: CardDetailViewModelProtocol>: ViewModifier {
+    @ObservedObject var viewModel: ViewModel
+
+    func body(content: Content) -> some View {
+        content.alert(
             "Error",
             isPresented: Binding(
                 get: { viewModel.uiState.errorMessage != nil },

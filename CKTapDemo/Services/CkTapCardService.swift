@@ -58,6 +58,45 @@ nonisolated final class CkTapCardService: Sendable {
         try await tapSigner.change(newCvc: newCvc, cvc: cvc)
     }
 
+    /// Signs an arbitrary text message using BIP-137 ("Bitcoin Signed Message")
+    /// digest format.
+    ///
+    /// The Tapsigner FFI doesn't expose the raw `signDigest` command yet —
+    /// tracked upstream as https://github.com/bitcoindevkit/rust-cktap/issues/70.
+    /// Once it lands, replace the `throw` with the real call.
+    func signTapsignerMessage(
+        transport: CkTransport,
+        message: String,
+        cvc: String
+    ) async throws -> SignedMessage {
+        Log.cktap.debug("toCktap: calling SELECT (sign-message flow)…")
+        let card = try await toCktap(transport: transport)
+        guard case .tapSigner(let tapSigner) = card else {
+            Log.cktap.error("sign-message requested but card is not a Tapsigner")
+            throw CkTapError.UnknownCardType
+        }
+
+        // Compute the BIP-137 digest now so the implementation stays close to
+        // the call site that will eventually use it.
+        let digest = BitcoinMessage.digest(message)
+        Log.cktap.debug("BIP-137 digest computed (\(digest.count) bytes)")
+
+        // TODO(rust-cktap#70): replace this throw with the real signing call:
+        //
+        //     let result = try await tapSigner.signDigest(
+        //         digest: digest,
+        //         subPath: [],
+        //         cvc: cvc
+        //     )
+        //     return SignedMessage(
+        //         message: message,
+        //         signature: result.signature.base64EncodedString()
+        //     )
+        _ = tapSigner
+        _ = cvc
+        throw MessageSigningError.notImplemented
+    }
+
     /// Returns the Tapsigner's BIP-32 xpub at either the master level or the
     /// currently-selected derivation path.
     func fetchTapsignerXpub(

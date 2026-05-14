@@ -7,6 +7,8 @@ nonisolated enum CKTapErrorFormatter {
 
     static func userMessage(for error: Error) -> String {
         switch error {
+        case let signingError as MessageSigningError:
+            return signingError.userMessage
         case let cardError as CardError:
             return message(forCard: cardError)
         case let ckTapError as CkTapError:

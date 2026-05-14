@@ -45,6 +45,7 @@ nonisolated struct CardsUiState {
         case .initialize: return "Initialize Tapsigner"
         case .fetchXpub: return "Tapsigner PIN"
         case .changePin: return "Tapsigner PIN"
+        case .signMessage: return "Tapsigner PIN"
         }
     }
 
@@ -58,6 +59,8 @@ nonisolated struct CardsUiState {
             return "Enter the Tapsigner CVC to read its XPUB."
         case .changePin:
             return "Enter the Tapsigner CVC to change its PIN."
+        case .signMessage:
+            return "Enter the Tapsigner CVC to sign the message."
         }
     }
 
@@ -67,6 +70,7 @@ nonisolated struct CardsUiState {
         case .initialize: return "Initialize"
         case .fetchXpub: return "Read"
         case .changePin: return "Change"
+        case .signMessage: return "Sign"
         }
     }
 }
@@ -205,6 +209,8 @@ final class CardsViewModel: CardsViewModelProtocol {
             Log.ui.info("Unexpected xpub outcome in Cards module (len: \(xpub.count))")
         case .pinChanged:
             Log.ui.info("Unexpected pinChanged outcome in Cards module")
+        case .signed:
+            Log.ui.info("Unexpected signed outcome in Cards module")
         case .failure(let message):
             Log.ui.error("Scan failure: \(message, privacy: .public)")
             uiState.errorMessage = message

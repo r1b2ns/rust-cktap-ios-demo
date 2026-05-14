@@ -5,6 +5,7 @@ import os
 // MARK: - Action
 
 enum TapsignerAction: String, Identifiable, CaseIterable {
+    case signMessage
     case showXpub
     case changePin
 
@@ -12,8 +13,9 @@ enum TapsignerAction: String, Identifiable, CaseIterable {
 
     var title: String {
         switch self {
-        case .showXpub:  return String(localized: "Show XPUB")
-        case .changePin: return String(localized: "Change PIN")
+        case .signMessage: return String(localized: "Sign message")
+        case .showXpub:    return String(localized: "Show XPUB")
+        case .changePin:   return String(localized: "Change PIN")
         }
     }
 }
@@ -34,6 +36,11 @@ protocol CardDetailViewModelProtocol: ObservableObject {
     func confirmChangePinScan()
     func cancelChangePinPrompt()
     func dismissChangePinSuccess()
+
+    // Sign message flow
+    func confirmSignMessageScan()
+    func cancelSignMessagePrompt()
+    func dismissSignature()
 
     func dismissError()
 }
@@ -58,6 +65,12 @@ nonisolated struct CardDetailUiState {
     var newPin: String = ""
     var confirmNewPin: String = ""
     var pinChangeSucceeded: Bool = false
+
+    // Sign message
+    var isAskingSignMessage: Bool = false
+    var signMessageText: String = ""
+    var signMessagePin: String = ""
+    var fetchedSignature: SignedMessage?
 
     var title: String { card.title }
 
@@ -101,6 +114,8 @@ final class CardDetailViewModel: CardDetailViewModelProtocol {
             requestShowXpub()
         case .changePin:
             requestChangePin()
+        case .signMessage:
+            requestSignMessage()
         }
     }
 
@@ -178,6 +193,47 @@ final class CardDetailViewModel: CardDetailViewModelProtocol {
         uiState.pinChangeSucceeded = false
     }
 
+    // MARK: - Sign message
+
+    func confirmSignMessageScan() {
+        let message = uiState.signMessageText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !message.isEmpty else {
+            uiState.errorMessage = String(localized: "Enter a message to sign.")
+            return
+        }
+
+        guard NFCReaderAvailability.isReadingAvailable else {
+            Log.nfc.error("NFC reading not available on this device")
+            uiState.errorMessage = "NFC is not available on this device."
+            return
+        }
+
+        let cvc = uiState.signMessagePin
+        Log.ui.info(
+            "Sign-message scan confirmed (msg length: \(message.count), cvc length: \(cvc.count))"
+        )
+        uiState.isScanning = true
+
+        let session = NFCCardSession(
+            cvc: cvc,
+            operation: .signMessage(message: message)
+        ) { [weak self] outcome in
+            Task { @MainActor [weak self] in
+                self?.handle(outcome)
+            }
+        }
+        self.session = session
+        session.begin()
+    }
+
+    func cancelSignMessagePrompt() {
+        clearSignMessageFields()
+    }
+
+    func dismissSignature() {
+        uiState.fetchedSignature = nil
+    }
+
     // MARK: - Error
 
     func dismissError() {
@@ -196,10 +252,20 @@ final class CardDetailViewModel: CardDetailViewModelProtocol {
         uiState.isAskingChangePin = true
     }
 
+    private func requestSignMessage() {
+        clearSignMessageFields()
+        uiState.isAskingSignMessage = true
+    }
+
     private func clearChangePinFields() {
         uiState.currentPin = ""
         uiState.newPin = ""
         uiState.confirmNewPin = ""
+    }
+
+    private func clearSignMessageFields() {
+        uiState.signMessageText = ""
+        uiState.signMessagePin = ""
     }
 
     private func validateChangePin() -> String? {
@@ -230,6 +296,10 @@ final class CardDetailViewModel: CardDetailViewModelProtocol {
             Log.ui.info("PIN change succeeded")
             clearChangePinFields()
             uiState.pinChangeSucceeded = true
+        case .signed(let signed):
+            Log.ui.info("Message signed (sig len: \(signed.signature.count))")
+            clearSignMessageFields()
+            uiState.fetchedSignature = signed
         case .failure(let message):
             Log.ui.error("Tapsigner action failure: \(message, privacy: .public)")
             uiState.errorMessage = message
